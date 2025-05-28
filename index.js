@@ -13,7 +13,12 @@ const documentRoutes = require("./routes/documentRoutes");
 const auditLogRoutes = require("./routes/auditLogRoutes");
 
 // Middleware
-app.use(cors());
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL || "http://localhost:5173", // Update this with your frontend URL
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 // Debug logging
@@ -23,6 +28,7 @@ console.log("Environment variables:", {
   MONGODB_URI: process.env.MONGODB_URI
     ? "MongoDB URI is set"
     : "MongoDB URI is not set",
+  NODE_ENV: process.env.NODE_ENV,
 });
 
 // MongoDB Connection
@@ -52,8 +58,8 @@ app.get("/", (req, res) => {
   res.send("Hello World!");
 });
 
-app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
+app.listen(port, "0.0.0.0", () => {
+  console.log(`Server is running on port ${port}`);
   console.log("Available routes:");
   console.log("- GET  /");
   console.log("- GET  /test");
