@@ -61,6 +61,7 @@ auditLogSchema.index({ action: 1, createdAt: -1 });
 auditLogSchema.index({ resourceType: 1, resourceId: 1 });
 auditLogSchema.index({ status: 1 });
 
+// Static methods
 auditLogSchema.statics.logAction = async function (logData) {
   const {
     userId,
@@ -69,33 +70,23 @@ auditLogSchema.statics.logAction = async function (logData) {
     resourceId,
     ipAddress,
     userAgent,
-    sessionId,
     details = {},
-    success = true,
-    errorMessage,
-    duration,
-    riskLevel = "low",
+    status = "success",
   } = logData;
 
   try {
     return await this.create({
-      userId,
+      user: userId,
       action,
       resourceType,
       resourceId,
       ipAddress,
       userAgent,
-      sessionId,
       details,
-      success,
-      errorMessage,
-      duration,
-      riskLevel,
-      timestamp: new Date(),
+      status,
     });
   } catch (error) {
     console.error("Failed to create audit log:", error);
-
     return null;
   }
 };
@@ -228,4 +219,6 @@ auditLogSchema.statics.cleanupOldLogs = async function (retentionDays = 365) {
   });
 };
 
-module.exports = mongoose.model("AuditLog", auditLogSchema);
+// Export the model only if it hasn't been defined yet
+module.exports =
+  mongoose.models.AuditLog || mongoose.model("AuditLog", auditLogSchema);

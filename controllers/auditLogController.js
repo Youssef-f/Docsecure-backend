@@ -1,6 +1,5 @@
 const AuditLog = require("../models/auditLog");
 
-// Get all audit logs (admin only)
 exports.getAuditLogs = async (req, res) => {
   try {
     const { startDate, endDate, action, resourceType, status } = req.query;
@@ -35,7 +34,6 @@ exports.getAuditLogs = async (req, res) => {
   }
 };
 
-// Get audit logs for a specific user
 exports.getUserAuditLogs = async (req, res) => {
   try {
     const userId = req.params.userId;
