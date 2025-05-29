@@ -461,8 +461,15 @@ exports.deleteDocument = async (req, res) => {
 // Share document with another user
 exports.shareDocument = async (req, res) => {
   try {
-    const { userId, accessType, expiresAt } = req.body;
+    const { userId, accessType } = req.body;
     const documentId = req.params.id;
+
+    console.log("Sharing document:", {
+      documentId,
+      userId,
+      accessType,
+      currentUser: req.user._id,
+    });
 
     const document = await Document.findOne({
       _id: documentId,
@@ -484,17 +491,20 @@ exports.shareDocument = async (req, res) => {
     if (existingShare) {
       // Update existing share
       existingShare.accessType = accessType;
-      existingShare.expiresAt = expiresAt;
     } else {
       // Add new share
       document.sharedWith.push({
         user: userId,
         accessType,
-        expiresAt,
       });
     }
 
     await document.save();
+
+    // Fetch the updated document with populated fields
+    const updatedDocument = await Document.findById(documentId)
+      .populate("owner", "username email")
+      .populate("sharedWith.user", "username email");
 
     await createAuditLog(
       req.user._id,
@@ -507,9 +517,10 @@ exports.shareDocument = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: document,
+      data: updatedDocument,
     });
   } catch (error) {
+    console.error("Share document error:", error);
     await createAuditLog(
       req.user._id,
       "document_share",
