@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const folderController = require("../controllers/folderController");
-const { protect } = require("../middleware/authMiddleware");
+const { protect } = require("../middleware/auth");
 
 // All routes are protected
 router.use(protect);
