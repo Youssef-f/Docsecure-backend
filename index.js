@@ -15,8 +15,14 @@ const auditLogRoutes = require("./routes/auditLogRoutes");
 // Middleware
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:5173", // Update this with your frontend URL
+    origin: [
+      "http://localhost:8080",
+      "http://localhost:5173",
+      process.env.FRONTEND_URL,
+    ].filter(Boolean),
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 app.use(express.json());
@@ -29,6 +35,7 @@ console.log("Environment variables:", {
     ? "MongoDB URI is set"
     : "MongoDB URI is not set",
   NODE_ENV: process.env.NODE_ENV,
+  FRONTEND_URL: process.env.FRONTEND_URL,
 });
 
 // MongoDB Connection
