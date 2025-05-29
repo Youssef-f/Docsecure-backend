@@ -1,24 +1,41 @@
 const AuditLog = require("../models/auditLog");
 
+// Get all audit logs (admin only)
 exports.getAuditLogs = async (req, res) => {
   try {
-    const { startDate, endDate, action, resourceType, status } = req.query;
-    const query = {};
-
-    if (startDate || endDate) {
-      query.createdAt = {};
-      if (startDate) query.createdAt.$gte = new Date(startDate);
-      if (endDate) query.createdAt.$lte = new Date(endDate);
+    // Check if user is admin
+    if (!req.user.isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Admin privileges required.",
+      });
     }
 
-    if (action) query.action = action;
-    if (resourceType) query.resourceType = resourceType;
-    if (status) query.status = status;
+    const { startDate, endDate, action, resourceType, userId } = req.query;
+    const query = {};
+
+    if (startDate && endDate) {
+      query.createdAt = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate),
+      };
+    }
+
+    if (action) {
+      query.action = action;
+    }
+
+    if (resourceType) {
+      query.resourceType = resourceType;
+    }
+
+    if (userId) {
+      query.user = userId;
+    }
 
     const logs = await AuditLog.find(query)
       .populate("user", "username email")
-      .sort({ createdAt: -1 })
-      .limit(100);
+      .sort({ createdAt: -1 });
 
     res.status(200).json({
       success: true,
@@ -34,58 +51,24 @@ exports.getAuditLogs = async (req, res) => {
   }
 };
 
-exports.getUserAuditLogs = async (req, res) => {
-  try {
-    const userId = req.params.userId;
-    const { startDate, endDate, action, resourceType, status } = req.query;
-    const query = { user: userId };
-
-    if (startDate || endDate) {
-      query.createdAt = {};
-      if (startDate) query.createdAt.$gte = new Date(startDate);
-      if (endDate) query.createdAt.$lte = new Date(endDate);
-    }
-
-    if (action) query.action = action;
-    if (resourceType) query.resourceType = resourceType;
-    if (status) query.status = status;
-
-    const logs = await AuditLog.find(query).sort({ createdAt: -1 }).limit(50);
-
-    res.status(200).json({
-      success: true,
-      count: logs.length,
-      data: logs,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Error fetching user audit logs",
-      error: error.message,
-    });
-  }
-};
-
-// Get audit logs for a specific resource
+// Get audit logs for a specific resource (admin only)
 exports.getResourceAuditLogs = async (req, res) => {
   try {
-    const { resourceType, resourceId } = req.params;
-    const { startDate, endDate, action, status } = req.query;
-    const query = { resourceType, resourceId };
-
-    if (startDate || endDate) {
-      query.createdAt = {};
-      if (startDate) query.createdAt.$gte = new Date(startDate);
-      if (endDate) query.createdAt.$lte = new Date(endDate);
+    // Check if user is admin
+    if (!req.user.isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Admin privileges required.",
+      });
     }
 
-    if (action) query.action = action;
-    if (status) query.status = status;
-
-    const logs = await AuditLog.find(query)
+    const { resourceType, resourceId } = req.params;
+    const logs = await AuditLog.find({
+      resourceType,
+      resourceId,
+    })
       .populate("user", "username email")
-      .sort({ createdAt: -1 })
-      .limit(50);
+      .sort({ createdAt: -1 });
 
     res.status(200).json({
       success: true,
@@ -96,6 +79,27 @@ exports.getResourceAuditLogs = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error fetching resource audit logs",
+      error: error.message,
+    });
+  }
+};
+
+// Get user's own audit logs
+exports.getUserAuditLogs = async (req, res) => {
+  try {
+    const logs = await AuditLog.find({ user: req.user._id }).sort({
+      createdAt: -1,
+    });
+
+    res.status(200).json({
+      success: true,
+      count: logs.length,
+      data: logs,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error fetching user audit logs",
       error: error.message,
     });
   }

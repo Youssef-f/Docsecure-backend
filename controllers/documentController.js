@@ -473,12 +473,24 @@ exports.deleteDocument = async (req, res) => {
     try {
       await fs.access(filePath);
       await fs.unlink(filePath);
+      console.log("File deleted successfully:", filePath);
     } catch (error) {
       console.error("Error deleting file:", error);
+      // Continue with database deletion even if file deletion fails
     }
 
-    // Delete from database
-    await Document.findByIdAndDelete(req.params.id);
+    // Delete from database using findOneAndDelete to ensure atomic operation
+    const deletedDoc = await Document.findOneAndDelete({
+      _id: req.params.id,
+      owner: req.user._id,
+    });
+
+    if (!deletedDoc) {
+      return res.status(404).json({
+        success: false,
+        message: "Document not found in database",
+      });
+    }
 
     await createAuditLog(
       req.user._id,
@@ -493,6 +505,7 @@ exports.deleteDocument = async (req, res) => {
       message: "Document deleted successfully",
     });
   } catch (error) {
+    console.error("Delete error:", error);
     await createAuditLog(
       req.user._id,
       "document_delete",
