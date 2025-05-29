@@ -1,5 +1,4 @@
 const Document = require("../models/Document");
-const Folder = require("../models/folder");
 const AuditLog = require("../models/auditLog");
 const path = require("path");
 const fs = require("fs").promises;
@@ -42,7 +41,7 @@ const createAuditLog = async (
 // Upload a new document
 exports.uploadDocument = async (req, res) => {
   try {
-    const { name, description, folderId, tags } = req.body;
+    const { name, description, tags } = req.body;
     const file = req.file;
 
     if (!file) {
@@ -108,7 +107,6 @@ exports.uploadDocument = async (req, res) => {
         fileType: file.mimetype,
         fileSize: file.size,
         owner: req.user._id,
-        folder: folderId,
         tags: tags ? tags.split(",").map((tag) => tag.trim()) : [],
         isEncrypted: true,
         encryptionKey: key,
@@ -164,15 +162,11 @@ exports.uploadDocument = async (req, res) => {
 // Get all documents for a user
 exports.getDocuments = async (req, res) => {
   try {
-    const { folderId, search, status = "active" } = req.query;
+    const { search, status = "active" } = req.query;
     const query = {
       $or: [{ owner: req.user._id }, { "sharedWith.user": req.user._id }],
       status,
     };
-
-    if (folderId) {
-      query.folder = folderId;
-    }
 
     if (search) {
       query.$or = [
@@ -184,7 +178,6 @@ exports.getDocuments = async (req, res) => {
 
     const documents = await Document.find(query)
       .populate("owner", "username email")
-      .populate("folder", "name path")
       .sort({ createdAt: -1 });
 
     await createAuditLog(
@@ -193,7 +186,7 @@ exports.getDocuments = async (req, res) => {
       "document",
       null,
       "success",
-      { search, folderId }
+      { search }
     );
 
     res.status(200).json({
@@ -237,9 +230,7 @@ exports.getDocument = async (req, res) => {
           },
         },
       ],
-    })
-      .populate("owner", "username email")
-      .populate("folder", "name path");
+    }).populate("owner", "username email");
 
     if (!document) {
       return res.status(404).json({
@@ -390,7 +381,7 @@ exports.downloadDocument = async (req, res) => {
 // Update document metadata
 exports.updateDocument = async (req, res) => {
   try {
-    const { name, description, folderId, tags } = req.body;
+    const { name, description, tags } = req.body;
     const document = await Document.findOne({
       _id: req.params.id,
       owner: req.user._id,
@@ -408,7 +399,6 @@ exports.updateDocument = async (req, res) => {
       {
         name,
         description,
-        folder: folderId,
         tags: tags ? tags.split(",").map((tag) => tag.trim()) : document.tags,
         version: document.version + 1,
       },
