@@ -38,46 +38,98 @@ exports.uploadDocument = async (req, res) => {
       return res.status(400).json({ message: "No file uploaded" });
     }
 
+    // Validate file size (10MB limit)
+    const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+    if (file.size > maxSize) {
+      // Delete the uploaded file
+      try {
+        await fs.unlink(file.path);
+      } catch (error) {
+        console.error("Error deleting oversized file:", error);
+      }
+      return res.status(400).json({ message: "File size exceeds 10MB limit" });
+    }
+
+    // Validate file type
+    const allowedTypes = [
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-powerpoint",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      "image/jpeg",
+      "image/png",
+      "image/gif",
+    ];
+
+    if (!allowedTypes.includes(file.mimetype)) {
+      // Delete the uploaded file
+      try {
+        await fs.unlink(file.path);
+      } catch (error) {
+        console.error("Error deleting invalid file:", error);
+      }
+      return res.status(400).json({ message: "File type not supported" });
+    }
+
     // Create encrypted file path
     const encryptedFilePath = path.join(
       path.dirname(file.path),
       `encrypted-${path.basename(file.path)}`
     );
 
-    // Encrypt the file
-    const { key, iv } = await encryptFile(file.path, encryptedFilePath);
+    try {
+      // Encrypt the file
+      const { key, iv } = await encryptFile(file.path, encryptedFilePath);
 
-    // Delete the original unencrypted file
-    await fs.unlink(file.path);
+      // Delete the original unencrypted file
+      await fs.unlink(file.path);
 
-    const document = await Document.create({
-      name: name || file.originalname,
-      description,
-      filePath: encryptedFilePath,
-      fileType: file.mimetype,
-      fileSize: file.size,
-      owner: req.user._id,
-      folder: folderId,
-      tags: tags ? tags.split(",").map((tag) => tag.trim()) : [],
-      isEncrypted: true,
-      encryptionKey: key,
-      encryptionIV: iv,
-    });
+      const document = await Document.create({
+        name: name || file.originalname,
+        description,
+        filePath: encryptedFilePath,
+        fileType: file.mimetype,
+        fileSize: file.size,
+        owner: req.user._id,
+        folder: folderId,
+        tags: tags ? tags.split(",").map((tag) => tag.trim()) : [],
+        isEncrypted: true,
+        encryptionKey: key,
+        encryptionIV: iv,
+      });
 
-    await createAuditLog(
-      req.user._id,
-      "document_upload",
-      "document",
-      document._id,
-      "success",
-      { fileName: file.originalname, fileSize: file.size }
-    );
+      await createAuditLog(
+        req.user._id,
+        "document_upload",
+        "document",
+        document._id,
+        "success",
+        { fileName: file.originalname, fileSize: file.size }
+      );
 
-    res.status(201).json({
-      success: true,
-      data: document,
-    });
+      res.status(201).json({
+        success: true,
+        data: document,
+      });
+    } catch (error) {
+      // Clean up files if encryption fails
+      try {
+        if (fs.existsSync(file.path)) {
+          await fs.unlink(file.path);
+        }
+        if (fs.existsSync(encryptedFilePath)) {
+          await fs.unlink(encryptedFilePath);
+        }
+      } catch (cleanupError) {
+        console.error("Error cleaning up files:", cleanupError);
+      }
+      throw error;
+    }
   } catch (error) {
+    console.error("Upload error:", error);
     await createAuditLog(
       req.user._id,
       "document_upload",
