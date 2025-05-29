@@ -16,6 +16,7 @@ router.post("/login", userController.login);
 router.get("/profile", auth, userController.getProfile);
 router.put("/profile", auth, userController.updateProfile);
 router.put("/change-password", auth, userController.changePassword);
+router.get("/by-email/:email", auth, userController.getUserByEmail);
 
 // Admin only routes
 router.get("/all", auth, userController.getAllUsers);

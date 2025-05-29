@@ -184,6 +184,32 @@ exports.changePassword = async (req, res) => {
   }
 };
 
+// Get user by email
+exports.getUserByEmail = async (req, res) => {
+  try {
+    const { email } = req.params;
+    const user = await User.findOne({ email }).select("-password");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: user,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error fetching user",
+      error: error.message,
+    });
+  }
+};
+
 // Get all users (admin only)
 exports.getAllUsers = async (req, res) => {
   try {
