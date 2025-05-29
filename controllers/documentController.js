@@ -5,6 +5,17 @@ const path = require("path");
 const fs = require("fs").promises;
 const { encryptFile, decryptFile } = require("../utils/encryption");
 
+// Ensure uploads directory exists
+const ensureUploadsDir = async () => {
+  const uploadsDir = path.join(process.cwd(), "uploads");
+  try {
+    await fs.access(uploadsDir);
+  } catch {
+    await fs.mkdir(uploadsDir, { recursive: true });
+  }
+  return uploadsDir;
+};
+
 // Helper function to create audit log
 const createAuditLog = async (
   userId,
@@ -37,6 +48,9 @@ exports.uploadDocument = async (req, res) => {
     if (!file) {
       return res.status(400).json({ message: "No file uploaded" });
     }
+
+    // Ensure uploads directory exists
+    const uploadsDir = await ensureUploadsDir();
 
     // Validate file size (10MB limit)
     const maxSize = 10 * 1024 * 1024; // 10MB in bytes
@@ -76,8 +90,8 @@ exports.uploadDocument = async (req, res) => {
 
     // Create encrypted file path
     const encryptedFilePath = path.join(
-      path.dirname(file.path),
-      `encrypted-${path.basename(file.path)}`
+      uploadsDir,
+      `encrypted-${Date.now()}-${path.basename(file.originalname)}`
     );
 
     try {
@@ -275,15 +289,6 @@ exports.downloadDocument = async (req, res) => {
           "sharedWith.user": req.user._id,
           "sharedWith.accessType": { $in: ["read", "write"] },
         },
-        {
-          accessRules: {
-            $elemMatch: {
-              type: "user",
-              value: req.user._id.toString(),
-              permission: { $in: ["read", "write", "admin"] },
-            },
-          },
-        },
       ],
     }).select("+encryptionKey +encryptionIV");
 
@@ -295,10 +300,22 @@ exports.downloadDocument = async (req, res) => {
       });
     }
 
+    // Ensure the file exists
+    try {
+      await fs.access(document.filePath);
+    } catch (error) {
+      console.error("File not found:", document.filePath);
+      return res.status(404).json({
+        success: false,
+        message: "Document file not found on server",
+      });
+    }
+
     // Create temporary decrypted file path
+    const uploadsDir = await ensureUploadsDir();
     const decryptedFilePath = path.join(
-      path.dirname(document.filePath),
-      `decrypted-${path.basename(document.filePath)}`
+      uploadsDir,
+      `decrypted-${Date.now()}-${path.basename(document.name)}`
     );
 
     // Decrypt the file
@@ -327,6 +344,7 @@ exports.downloadDocument = async (req, res) => {
       }
     });
   } catch (error) {
+    console.error("Download error:", error);
     await createAuditLog(
       req.user._id,
       "document_download",
