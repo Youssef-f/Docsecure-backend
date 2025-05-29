@@ -3,8 +3,8 @@ const AuditLog = require("../models/auditLog");
 // Get all audit logs (admin only)
 exports.getAuditLogs = async (req, res) => {
   try {
-    // Check if user is admin
-    if (!req.user.isAdmin) {
+    // Check if user has admin role
+    if (!req.user.roles || !req.user.roles.includes("admin")) {
       return res.status(403).json({
         success: false,
         message: "Access denied. Admin privileges required.",
@@ -54,8 +54,8 @@ exports.getAuditLogs = async (req, res) => {
 // Get audit logs for a specific resource (admin only)
 exports.getResourceAuditLogs = async (req, res) => {
   try {
-    // Check if user is admin
-    if (!req.user.isAdmin) {
+    // Check if user has admin role
+    if (!req.user.roles || !req.user.roles.includes("admin")) {
       return res.status(403).json({
         success: false,
         message: "Access denied. Admin privileges required.",
