@@ -281,6 +281,9 @@ exports.getDocument = async (req, res) => {
 // Download a document
 exports.downloadDocument = async (req, res) => {
   try {
+    console.log("Download request for document:", req.params.id);
+    console.log("User ID:", req.user._id);
+
     const document = await Document.findOne({
       _id: req.params.id,
       $or: [
@@ -293,6 +296,7 @@ exports.downloadDocument = async (req, res) => {
     }).select("+encryptionKey +encryptionIV");
 
     if (!document) {
+      console.log("Document not found or no permission");
       return res.status(404).json({
         success: false,
         message:
@@ -300,11 +304,28 @@ exports.downloadDocument = async (req, res) => {
       });
     }
 
+    // Ensure uploads directory exists
+    const uploadsDir = await ensureUploadsDir();
+
+    // Use absolute path for file operations
+    const filePath = path.isAbsolute(document.filePath)
+      ? document.filePath
+      : path.join(uploadsDir, path.basename(document.filePath));
+
+    console.log("Document found:", {
+      id: document._id,
+      name: document.name,
+      filePath: filePath,
+    });
+
     // Ensure the file exists
     try {
-      await fs.access(document.filePath);
+      await fs.access(filePath);
     } catch (error) {
-      console.error("File not found:", document.filePath);
+      console.error("File not found:", {
+        path: filePath,
+        error: error.message,
+      });
       return res.status(404).json({
         success: false,
         message: "Document file not found on server",
@@ -312,15 +333,19 @@ exports.downloadDocument = async (req, res) => {
     }
 
     // Create temporary decrypted file path
-    const uploadsDir = await ensureUploadsDir();
     const decryptedFilePath = path.join(
       uploadsDir,
       `decrypted-${Date.now()}-${path.basename(document.name)}`
     );
 
+    console.log("Decrypting file:", {
+      from: filePath,
+      to: decryptedFilePath,
+    });
+
     // Decrypt the file
     await decryptFile(
-      document.filePath,
+      filePath,
       decryptedFilePath,
       document.encryptionKey,
       document.encryptionIV
@@ -426,24 +451,33 @@ exports.deleteDocument = async (req, res) => {
   try {
     const document = await Document.findOne({
       _id: req.params.id,
-      owner: req.user._id,
+      owner: req.user._id, // Only owner can delete
     });
 
     if (!document) {
       return res.status(404).json({
         success: false,
-        message: "Document not found",
+        message: "Document not found or you don't have permission to delete it",
       });
     }
 
+    // Ensure uploads directory exists
+    const uploadsDir = await ensureUploadsDir();
+
+    // Use absolute path for file operations
+    const filePath = path.isAbsolute(document.filePath)
+      ? document.filePath
+      : path.join(uploadsDir, path.basename(document.filePath));
+
     // Delete the file from storage
     try {
-      await fs.unlink(document.filePath);
+      await fs.access(filePath);
+      await fs.unlink(filePath);
     } catch (error) {
       console.error("Error deleting file:", error);
     }
 
-    // Use findByIdAndDelete instead of remove()
+    // Delete from database
     await Document.findByIdAndDelete(req.params.id);
 
     await createAuditLog(
