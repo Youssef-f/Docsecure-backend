@@ -11,6 +11,7 @@ const cors = require("cors");
 const userRoutes = require("./routes/userRoutes");
 const documentRoutes = require("./routes/documentRoutes");
 const auditLogRoutes = require("./routes/auditLogRoutes");
+const folderRoutes = require("./routes/folderRoutes");
 
 // Middleware
 app.use(
@@ -55,6 +56,7 @@ mongoose
 app.use("/api/users", userRoutes);
 app.use("/api/documents", documentRoutes);
 app.use("/api/audit-logs", auditLogRoutes);
+app.use("/api/folders", folderRoutes);
 
 // Debug route
 app.get("/test", (req, res) => {
@@ -79,4 +81,8 @@ app.listen(port, "0.0.0.0", () => {
   console.log("- PUT  /api/documents/:id");
   console.log("- DELETE /api/documents/:id");
   console.log("- POST /api/documents/:id/share");
+  console.log("- POST /api/folders");
+  console.log("- GET  /api/folders");
+  console.log("- PUT  /api/folders/:id");
+  console.log("- DELETE /api/folders/:id");
 });
